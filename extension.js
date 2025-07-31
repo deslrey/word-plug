@@ -7,6 +7,7 @@ let currentIndex = 0;
 let displayItem;
 let prevButton;
 let nextButton;
+let positionIndicator;
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -60,6 +61,13 @@ function activate(context) {
     prevButton.show();
     context.subscriptions.push(prevButton);
 
+    positionIndicator = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        101.5
+    );
+    context.subscriptions.push(positionIndicator);
+    positionIndicator.show();
+
     nextButton = vscode.window.createStatusBarItem(
         vscode.StatusBarAlignment.Left,
         101
@@ -97,11 +105,15 @@ function activate(context) {
     function updateDisplay() {
         if (!keys.length) {
             displayItem.text = "📘 请先选择 JSON 文件";
+            positionIndicator.text = "";
         } else {
             const key = keys[currentIndex];
             displayItem.text = `📘 ${key}: ${jsonData[key]}`;
+            positionIndicator.text = `${currentIndex + 1}/${keys.length}`;
         }
+
         displayItem.show();
+        positionIndicator.show();
     }
 }
 
