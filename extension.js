@@ -1,36 +1,113 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-const vscode = require('vscode');
+const vscode = require("vscode");
+const fs = require("fs");
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+let jsonData = {};
+let keys = [];
+let currentIndex = 0;
+let displayItem;
+let prevButton;
+let nextButton;
 
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+    console.log("wordplug is now active!");
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "word-plug" is now active!');
+    // 命令：加载 JSON 文件
+    const loadCommand = vscode.commands.registerCommand(
+        "wordplug.loadJson",
+        async () => {
+            const uri = await vscode.window.showOpenDialog({
+                canSelectMany: false,
+                openLabel: "word-plug-json",
+                filters: {
+                    JSON: ["json"],
+                },
+            });
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('word-plug.helloWorld', function () {
-		// The code you place here will be executed every time your command is executed
+            if (!uri || uri.length === 0) {
+                vscode.window.showWarningMessage("未选择任何文件");
+                return;
+            }
 
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from word-plug!');
-	});
+            try {
+                const content = fs.readFileSync(uri[0].fsPath, "utf8");
+                jsonData = JSON.parse(content);
+                keys = Object.keys(jsonData);
+                currentIndex = 0;
+                vscode.window.showInformationMessage(
+                    `JSON 加载成功，共有 ${keys.length} 项`
+                );
+                updateDisplay();
+            } catch (e) {
+                vscode.window.showErrorMessage(
+                    "读取或解析 JSON 失败: " + e.message
+                );
+            }
+        }
+    );
 
-	context.subscriptions.push(disposable);
+    context.subscriptions.push(loadCommand);
+
+    prevButton = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        102
+    );
+    prevButton.text = "⬅️";
+    prevButton.command = "wordplug.prev";
+    prevButton.tooltip = "上一项";
+    prevButton.show();
+    context.subscriptions.push(prevButton);
+
+    nextButton = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        101
+    );
+
+    nextButton.text = "➡️";
+    nextButton.command = "wordplug.next";
+    nextButton.tooltip = "下一项";
+    nextButton.show();
+    context.subscriptions.push(nextButton);
+
+    // 状态栏展示项
+    displayItem = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        100
+    );
+    context.subscriptions.push(displayItem);
+
+    // 上一项
+    const prevCommand = vscode.commands.registerCommand("wordplug.prev", () => {
+        if (!keys.length) return;
+        currentIndex = (currentIndex - 1 + keys.length) % keys.length;
+        updateDisplay();
+    });
+    context.subscriptions.push(prevCommand);
+
+    // 下一项
+    const nextCommand = vscode.commands.registerCommand("wordplug.next", () => {
+        if (!keys.length) return;
+        currentIndex = (currentIndex + 1) % keys.length;
+        updateDisplay();
+    });
+    context.subscriptions.push(nextCommand);
+
+    function updateDisplay() {
+        if (!keys.length) {
+            displayItem.text = "📘 请先选择 JSON 文件";
+        } else {
+            const key = keys[currentIndex];
+            displayItem.text = `📘 ${key}: ${jsonData[key]}`;
+        }
+        displayItem.show();
+    }
 }
 
-// This method is called when your extension is deactivated
 function deactivate() {}
 
 module.exports = {
-	activate,
-	deactivate
-}
+    activate,
+    deactivate,
+};
