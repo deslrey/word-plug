@@ -8,6 +8,9 @@ let displayItem;
 let prevButton;
 let nextButton;
 let positionIndicator;
+let modeToggleButton;
+
+let isSpellingMode = false; // 🔄 模式状态
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -15,7 +18,6 @@ let positionIndicator;
 function activate(context) {
     console.log("wordplug is now active!");
 
-    // 命令：加载 JSON 文件
     const loadCommand = vscode.commands.registerCommand(
         "wordplug.loadJson",
         async () => {
@@ -51,6 +53,7 @@ function activate(context) {
 
     context.subscriptions.push(loadCommand);
 
+    // 上一项按钮
     prevButton = vscode.window.createStatusBarItem(
         vscode.StatusBarAlignment.Left,
         102
@@ -61,6 +64,7 @@ function activate(context) {
     prevButton.show();
     context.subscriptions.push(prevButton);
 
+    // 当前位置
     positionIndicator = vscode.window.createStatusBarItem(
         vscode.StatusBarAlignment.Left,
         101.5
@@ -68,16 +72,27 @@ function activate(context) {
     context.subscriptions.push(positionIndicator);
     positionIndicator.show();
 
+    // 下一项按钮
     nextButton = vscode.window.createStatusBarItem(
         vscode.StatusBarAlignment.Left,
         101
     );
-
     nextButton.text = "➡️";
     nextButton.command = "wordplug.next";
     nextButton.tooltip = "下一项";
     nextButton.show();
     context.subscriptions.push(nextButton);
+
+    // 模式切换按钮
+    modeToggleButton = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        100.5
+    );
+    modeToggleButton.text = "👁️";
+    modeToggleButton.command = "wordplug.toggleMode";
+    modeToggleButton.tooltip = "点击切换拼写/查看模式";
+    modeToggleButton.show();
+    context.subscriptions.push(modeToggleButton);
 
     // 状态栏展示项
     displayItem = vscode.window.createStatusBarItem(
@@ -86,7 +101,6 @@ function activate(context) {
     );
     context.subscriptions.push(displayItem);
 
-    // 上一项
     const prevCommand = vscode.commands.registerCommand("wordplug.prev", () => {
         if (!keys.length) return;
         currentIndex = (currentIndex - 1 + keys.length) % keys.length;
@@ -94,7 +108,6 @@ function activate(context) {
     });
     context.subscriptions.push(prevCommand);
 
-    // 下一项
     const nextCommand = vscode.commands.registerCommand("wordplug.next", () => {
         if (!keys.length) return;
         currentIndex = (currentIndex + 1) % keys.length;
@@ -102,16 +115,49 @@ function activate(context) {
     });
     context.subscriptions.push(nextCommand);
 
-    function updateDisplay() {
+    const toggleModeCommand = vscode.commands.registerCommand(
+        "wordplug.toggleMode",
+        () => {
+            isSpellingMode = !isSpellingMode;
+            modeToggleButton.text = isSpellingMode ? "✏️" : "👁️";
+            updateDisplay();
+        }
+    );
+    context.subscriptions.push(toggleModeCommand);
+
+    async function updateDisplay() {
         if (!keys.length) {
             displayItem.text = "📘 请先选择 JSON 文件";
             positionIndicator.text = "";
-        } else {
-            const key = keys[currentIndex];
-            displayItem.text = `📘 ${key}: ${jsonData[key]}`;
-            positionIndicator.text = `${currentIndex + 1}/${keys.length}`;
+            return;
         }
 
+        const key = keys[currentIndex];
+        const value = jsonData[key];
+
+        if (isSpellingMode) {
+            const input = await vscode.window.showInputBox({
+                prompt: `翻译: ${value}\n请输入对应的文本：`,
+                placeHolder: "请输入对应的英文单词",
+                ignoreFocusOut: true,
+            });
+
+            if (input !== undefined) {
+                if (input.trim().toLowerCase() === key.toLowerCase()) {
+                    vscode.window.showInformationMessage("✅ 拼写正确！");
+                } else {
+                    vscode.window.showErrorMessage(
+                        `❌ 拼写错误，正确答案是：${key}`
+                    );
+                }
+            }
+
+            displayItem.text = `✏️ 翻译: ${value}`;
+        } else {
+            displayItem.text = `📘 ${key}: ${value}`;
+        }
+
+        positionIndicator.text = `${currentIndex + 1}/${keys.length}`;
         displayItem.show();
         positionIndicator.show();
     }
